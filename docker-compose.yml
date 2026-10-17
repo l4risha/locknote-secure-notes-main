@@ -1,0 +1,31 @@
+# Local PostgreSQL for LockNote.
+#
+# Usage:
+#   cp .env.example .env    # then choose your own password
+#   docker compose up -d
+#
+# The password is read from POSTGRES_PASSWORD in a local `.env` file
+# (git-ignored). No credentials are stored in this file.
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: locknote-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: locknote
+      POSTGRES_USER: locknote
+      # Fails with a clear message when .env is missing — never a default password.
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env (copy .env.example)}
+    ports:
+      - "5432:5432"
+    volumes:
+      - locknote_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U locknote -d locknote"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  locknote_pgdata:

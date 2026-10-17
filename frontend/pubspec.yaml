@@ -1,0 +1,27 @@
+name: locknote_app
+description: "LockNote — secure personal notes, Flutter Web client."
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.13.0
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # HTTP client used for every API call (works on web and on the VM, which
+  # lets the tests inject a mock backend).
+  http: ^1.2.0
+
+  # Minimal browser bindings for persisting the session token in
+  # localStorage (conditional import: web only).
+  web: ^1.1.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
