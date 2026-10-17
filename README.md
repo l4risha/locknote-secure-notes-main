@@ -1,182 +1,127 @@
 # LockNote — Secure Personal Notes System
 
-A complete full-stack notes application with user registration, login, and
-per-user private notes.
+LockNote is a full-stack personal notes application with user registration, authentication, and private notes for each account.
 
-| Layer     | Technology            |
-| --------- | --------------------- |
-| Frontend  | **Flutter Web (Dart)** |
-| Backend   | **Dart + Shelf**       |
-| Database  | **PostgreSQL**         |
-| Passwords | **PBKDF2-HMAC-SHA256** (salted, per-password random salt) |
+## Technology Stack
 
----
+| Layer | Technology |
+|---|---|
+| Frontend | Flutter Web (Dart) |
+| Backend | Dart + Shelf REST API |
+| Database | PostgreSQL |
+| Password hashing | PBKDF2-HMAC-SHA256 with a random salt per password |
 
 ## Features
 
-**Application**
+### Application
+- Register an account and sign in.
+- Create, view, edit, and delete personal notes.
+- Search notes by title or content, case-insensitively.
+- View a dashboard with total notes, notes updated in the last 7 days, and recently updated notes.
+- Use a responsive interface with desktop navigation and a mobile-friendly layout.
+- Get form validation, loading states, success messages, and error feedback.
 
-- User registration and login with server-side sessions
-- Create, view, edit, and delete personal notes
-- Search notes by title **or** content (case-insensitive, SQL-side)
-- Dashboard with total notes, notes updated in the last 7 days, and the
-  5 most recently updated notes
-- Responsive layout: sidebar on desktop, drawer + stacked search bar on mobile
-- Form validation, loading states, success snackbar, and error banners
-  everywhere
+### Security
+- Passwords are stored as salted PBKDF2-HMAC-SHA256 hashes, not as plain text.
+- SQL queries use parameters instead of concatenating user input into SQL.
+- Protected API routes verify the user's server-side session.
+- Notes are scoped to their owner; one user cannot access another user's notes.
+- Login responses are designed to avoid revealing whether an email address exists.
+- Database credentials and other secrets are configured through environment variables or a local, ignored `.env` file.
+- Session tokens can be revoked on logout.
+- API responses include security-focused headers, and error responses do not expose stack traces.
 
-**Security**
+> Security features depend on the code and configuration in the checked-out version. Do not commit real passwords, tokens, or `.env` files.
 
-- Passwords are **never stored in plain text** — only
-  `pbkdf2_sha256$<iterations>$<salt>$<key>` hashes (see
-  `backend/lib/src/passwords.dart`, a dependency-free implementation you can
-  read and audit)
-- **Parameterized SQL everywhere** — every query uses named bind parameters
-  (`Sql.named` + `parameters:`); user input is never concatenated into SQL
-- **Authentication is verified on the server** for every protected endpoint
-  (`Authorization: Bearer <token>` → SHA-256 digest lookup in `sessions`,
-  expiry checked against the database clock, deleted on logout)
-- **Users can only touch their own notes** — every statement is filtered by
-  `WHERE user_id = @userId`; other users' note IDs behave exactly like
-  non-existent notes (404)
-- Login answers *byte-identical* 401s for "wrong password" and "unknown
-  email", and performs the same hashing work, so accounts cannot be enumerated
-- Database credentials and secrets come **only** from environment variables /
-  a git-ignored `.env` file — startup fails fast if they are missing
-- No hardcoded or fake users anywhere: accounts are created through the real
-  registration flow and verified against PostgreSQL
-- Extra hardening: constant-time hash comparison, escaped `LIKE` patterns,
-  `no-store` on API responses, `nosniff` / `X-Frame-Options: DENY` /
-  `Referrer-Policy` headers, JSON-only error responses with no stack traces,
-  request logging that never prints headers or bodies
+## Project Structure
 
----
-
-## Project structure
-
-```
+```text
 .
-├── backend/                    # Dart + Shelf REST API
-│   ├── bin/
-│   │   ├── server.dart         # API server entry point
-│   │   └── migrate.dart        # applies SQL migrations
-│   ├── lib/src/
-│   │   ├── app.dart            # router, CORS, security headers, errors, static files
-│   │   ├── auth.dart           # requireAuth() guard used by protected routes
-│   │   ├── config.dart         # env-var configuration (fails fast when missing)
-│   │   ├── database.dart       # PostgreSQL wrapper (parameterized queries only)
-│   │   ├── handlers/           # auth + notes endpoints
-│   │   ├── migrations.dart     # migration runner (schema_migrations table)
-│   │   ├── passwords.dart      # PBKDF2 hashing & constant-time verification
-│   │   ├── session_store.dart  # create/verify/revoke bearer sessions
-│   │   └── validation.dart     # shared input validation + LIKE escaping
-│   ├── migrations/001_init.sql # database schema
-│   ├── test/                   # 43 tests (unit + full API integration)
-│   ├── tool/benchmark_passwords.dart
-│   └── .env.example            # environment variable template (no secrets)
-├── frontend/                   # Flutter Web app
-│   ├── lib/src/
-│   │   ├── app.dart             # auth gate: splash → login → dashboard
-│   │   ├── core/                # API client, platform session storage
-│   │   ├── models/              # User, Note, DashboardSummary
-│   │   ├── screens/             # auth, home shell, dashboard, notes
-│   │   ├── state/               # AuthController, NotesController
-│   │   └── widgets/             # text fields, cards, dialogs, banners…
-│   └── test/                    # widget tests against a mock backend
-├── docker-compose.yml          # local PostgreSQL 16
-├── .gitignore                  # excludes .env, build output, IDE files
+├── backend/
+│   ├── bin/                  # Backend server and migration entry points
+│   ├── lib/src/              # API, authentication, database, and application logic
+│   ├── migrations/           # SQL database migrations
+│   ├── test/                 # Backend tests
+│   ├── tool/                 # Developer tools
+│   └── .env.example          # Environment-variable template
+├── frontend/
+│   ├── lib/src/              # Flutter application source
+│   └── test/                 # Frontend tests
+├── docker-compose.yml        # Local PostgreSQL configuration
+├── .gitignore
 └── README.md
 ```
 
----
-
 ## Prerequisites
 
-- **Dart SDK** ≥ 3.5 (backend)
-- **Flutter SDK** ≥ 3.13 / stable channel (frontend)
-- **PostgreSQL** ≥ 14 — via Docker (`docker compose`) or a local install
-- (Optional) `curl` or any HTTP client for manual API testing
+Install the following before running the project:
 
----
+- [Dart SDK](https://dart.dev/get-dart) (backend)
+- [Flutter SDK](https://docs.flutter.dev/get-started/install) (frontend)
+- [PostgreSQL](https://www.postgresql.org/download/) 14 or newer, or Docker with the Docker Compose plugin
 
-## 1. Database
+## Setup
 
-### Option A — Docker (recommended)
+### 1. Configure PostgreSQL
+
+The repository includes a Docker Compose configuration for local development.
+
+From the project root, copy the environment template:
 
 ```sh
-cp .env.example .env       # choose your own password (`.env` is git-ignored)
+cp .env.example .env
+```
+
+Set a strong local database password in `.env`, then start PostgreSQL:
+
+```sh
 docker compose up -d
 ```
 
-This starts PostgreSQL 16 on `localhost:5432` with:
+The supplied configuration is intended to create a local database named `locknote` with a `locknote` database user. Check `docker-compose.yml` and the environment template for the exact variable names and values expected by your version of the project.
 
-| Setting    | Value                              |
-| ---------- | ---------------------------------- |
-| Database   | `locknote`                         |
-| User       | `locknote`                         |
-| Password   | `POSTGRES_PASSWORD` from your `.env` |
+If you use a locally installed PostgreSQL server instead, create a database and user, then configure the backend to connect to them.
 
-No password is stored anywhere in the repository — `docker compose` refuses to
-start until you set one.
+**Windows PowerShell note:** If `cp` is unavailable in your shell, use:
 
-### Option B — local PostgreSQL
-
-```sh
-sudo -u postgres createuser locknote --pwprompt
-sudo -u postgres createdb locknote -O locknote
+```powershell
+Copy-Item .env.example .env
 ```
 
-> Never use weak credentials outside your own machine — put real values in
-> `backend/.env`, which is git-ignored.
+### 2. Configure and run the backend
 
----
-
-## 2. Backend
+Open a terminal in the backend folder:
 
 ```sh
 cd backend
-cp .env.example .env         # then edit the values (never commit .env)
-                             # DB_PASSWORD = the POSTGRES_PASSWORD from step 1
-dart pub get
-dart run bin/migrate.dart    # creates tables from migrations/*.sql
-dart run bin/server.dart     # http://localhost:8080
 ```
 
-The server also applies pending migrations on startup (`AUTO_MIGRATE=true`),
-retries the database connection while it boots, and exposes:
+Copy the backend environment template if needed:
 
-- `GET /api/health` → `{"status":"ok"}`
+```sh
+cp .env.example .env
+```
 
-### Environment variables (`backend/.env.example`)
+Edit `backend/.env` with the connection settings for your PostgreSQL database. Keep this file private and do not commit it.
 
-| Variable            | Required | Default     | Purpose                                    |
-| ------------------- | -------- | ----------- | ------------------------------------------ |
-| `DB_HOST`           | ✅       | —           | PostgreSQL host                            |
-| `DB_PORT`           |          | `5432`      | PostgreSQL port                            |
-| `DB_NAME`           | ✅       | —           | Database name                              |
-| `DB_USER`           | ✅       | —           | Database user                              |
-| `DB_PASSWORD`       | ✅       | —           | Database password (never commit it)        |
-| `DB_SSL`            |          | `disable`   | `disable` \| `require` \| `verify-full`    |
-| `SERVER_HOST`       |          | `0.0.0.0`   | Listen interface                           |
-| `SERVER_PORT`       |          | `8080`      | Listen port                                |
-| `ALLOWED_ORIGINS`   |          | *(any)*     | Comma-separated CORS origins for dev       |
-| `STATIC_DIR`        |          | *(empty)*   | Serve a built Flutter app from this dir    |
-| `SESSION_TTL_HOURS` |          | `720`       | Session lifetime in hours (30 days)          |
-| `PBKDF2_ITERATIONS` |          | `100000`    | Password hashing work factor               |
-| `AUTO_MIGRATE`      |          | `true`      | Apply migrations at startup                |
+Install dependencies and apply database migrations:
 
-Real environment variables always override `.env`. If a required variable is
-missing, the server prints exactly which one and exits — it never falls back
-to a built-in password.
+```sh
+dart pub get
+dart run bin/migrate.dart
+```
 
-Set `DB_SSL=require` (or `verify-full`) when your database uses TLS, e.g.
-managed PostgreSQL.
+Start the API server:
 
----
+```sh
+dart run bin/server.dart
+```
 
-## 3. Frontend
+The default API address is `http://localhost:8080`, unless your environment configuration specifies another host or port.
 
-### Development (two ports, CORS enabled)
+### 3. Run the frontend
+
+Open a separate terminal:
 
 ```sh
 cd frontend
@@ -184,149 +129,89 @@ flutter pub get
 flutter run -d web-server --web-port 5273
 ```
 
-The app talks to `http://localhost:8080` by default. Override with:
+Open `http://localhost:5273` in your browser.
+
+By default, the frontend is configured to use the API at `http://localhost:8080`. If your project uses the `API_BASE_URL` Dart define, you can set it explicitly:
 
 ```sh
 flutter run -d web-server --web-port 5273 --dart-define=API_BASE_URL=http://localhost:8080
 ```
 
-Make sure `ALLOWED_ORIGINS` in `backend/.env` includes your dev origin
-(e.g. `http://localhost:5273`).
+Make sure the backend's allowed CORS origins include `http://localhost:5273` if your backend configuration requires it.
 
-### Single-origin build (backend serves the UI)
+## API Overview
 
-```sh
-cd frontend
-flutter build web --release --dart-define=API_BASE_URL=
+The backend provides authentication, notes, and dashboard endpoints. The exact response shapes should be checked in the current backend handlers.
 
-cd ../backend
-STATIC_DIR=../frontend/build/web dart run bin/server.dart
-# → http://localhost:8080  (UI + API from one origin, no CORS needed)
+| Method | Endpoint | Purpose |
+|---|---|---|
+| `POST` | `/api/auth/register` | Register a new account |
+| `POST` | `/api/auth/login` | Sign in |
+| `POST` | `/api/auth/logout` | End the current session |
+| `GET` | `/api/auth/me` | Get the authenticated user |
+| `GET` | `/api/notes?search=` | List the authenticated user's notes, optionally filtered |
+| `POST` | `/api/notes` | Create a note |
+| `GET` | `/api/notes/{id}` | Get one of the authenticated user's notes |
+| `PUT` | `/api/notes/{id}` | Update one of the authenticated user's notes |
+| `DELETE` | `/api/notes/{id}` | Delete one of the authenticated user's notes |
+| `GET` | `/api/dashboard` | Get dashboard summary information |
+| `GET` | `/api/health` | Check whether the API is running |
+
+Protected endpoints require the authentication token returned by the login endpoint, typically in this header:
+
+```http
+Authorization: Bearer <token>
 ```
 
-An empty `API_BASE_URL` makes every request relative to the page origin.
+## Database Tables
 
----
+The initial migration defines the core application tables. In the supplied schema, these include:
 
-## API reference
+- **`users`** — account information and password hashes.
+- **`notes`** — note content associated with an owner account.
+- **`sessions`** — server-side session records and expiration information.
 
-All request/response bodies are JSON. Protected endpoints require
-`Authorization: Bearer <token>` (returned by register/login).
+To inspect registered accounts in PostgreSQL, you can run:
 
-| Method   | Path                | Auth | Description                                    |
-| -------- | ------------------- | ---- | ---------------------------------------------- |
-| `POST`   | `/api/auth/register`| –    | `{name,email,password}` → `201 {token,user}`   |
-| `POST`   | `/api/auth/login`   | –    | `{email,password}` → `200 {token,user}`        |
-| `POST`   | `/api/auth/logout`  | ✅   | Revokes the session token                      |
-| `GET`    | `/api/auth/me`      | ✅   | Current user                                   |
-| `GET`    | `/api/notes?search=`| ✅   | Own notes (optionally filtered), newest first  |
-| `POST`   | `/api/notes`        | ✅   | `{title,content}` → `201 {note}`               |
-| `GET`    | `/api/notes/{id}`   | ✅   | One owned note (else `404`)                    |
-| `PUT`    | `/api/notes/{id}`   | ✅   | Update owned note (else `404`)                 |
-| `DELETE` | `/api/notes/{id}`   | ✅   | Delete owned note (else `404`)                 |
-| `GET`    | `/api/dashboard`    | ✅   | `{totalNotes,updatedLast7Days,recentNotes}`    |
-| `GET`    | `/api/health`       | –    | Liveness check                                 |
-
-Errors use one envelope:
-
-```json
-{ "error": "Human-readable message", "code": "validation_failed",
-  "details": { "email": "This email is already registered." } }
+```sql
+SELECT id, name, email, created_at
+FROM users
+ORDER BY id DESC;
 ```
 
----
+This query shows registered accounts; it does **not** provide a history of every login. Login history requires a dedicated logging table and backend code to record login events.
 
-## Database schema
+## Tests and Code Quality
 
-`backend/migrations/001_init.sql` (applied automatically, tracked in
-`schema_migrations`):
+Run the commands relevant to the part of the project you are checking.
 
-- **users** — `id, name, email (unique, case-insensitive), password_hash, created_at`
-- **notes** — `id, user_id → users (ON DELETE CASCADE), title, content, created_at, updated_at`
-  with indexes on `user_id` and `(user_id, updated_at DESC)`
-- **sessions** — `id, user_id, token_hash (SHA-256 of the bearer token, unique),
-  created_at, expires_at`
-
-Add a new numbered `.sql` file to `migrations/` and rerun
-`dart run bin/migrate.dart` to evolve the schema.
-
----
-
-## Tests, analysis, formatting
+Backend:
 
 ```sh
-# Backend — 43 tests: crypto vectors, validation, and a full API integration
-# suite that runs against PostgreSQL (auto-skips with a clear message when no
-# database is reachable — it never fakes a pass).
 cd backend
-dart format --set-exit-if-changed lib bin test tool
+dart format lib bin test tool
 dart analyze
-DB_HOST=localhost DB_PORT=5432 DB_USER=locknote DB_PASSWORD=... DB_NAME=locknote dart test
+dart test
+```
 
-# Frontend — widget tests against a mocked backend
+Frontend:
+
+```sh
 cd frontend
-dart format --set-exit-if-changed lib test
+dart format lib test
 flutter analyze
 flutter test
 ```
 
-`TEST_DB_NAME` overrides the integration test database
-(default: `<DB_NAME>_test`, created automatically; test rows are cleaned up
-afterwards).
+Some integration tests may require a reachable PostgreSQL database and appropriate test database configuration. Check the test output and project configuration rather than assuming every test ran.
 
-Tune the password work factor for your machine:
+## Environment and Secrets
 
-```sh
-cd backend && dart run tool/benchmark_passwords.dart
-```
-
----
-
-## What was verified, and what you must configure
-
-This implementation was exercised end-to-end in its build environment:
-
-| Check                                                            | Status |
-| ---------------------------------------------------------------- | ------ |
-| `dart analyze` / `flutter analyze` (both projects)               | ✅ no issues |
-| `dart test` — 43 tests incl. **live PostgreSQL integration suite** | ✅ all pass |
-| `flutter test` — 5 widget tests (validation, login, navigation)  | ✅ all pass |
-| `flutter build web --release`                                    | ✅ built |
-| Server run with real PostgreSQL 16: register → login → CRUD → search → dashboard → logout | ✅ 21/21 checks |
-| Cross-user isolation (user B vs user A's note IDs)               | ✅ 404 on read/update/delete |
-| Revoked/expired/garbage tokens                                   | ✅ 401 |
-| Static UI + API served from one origin, SPA fallback, security headers | ✅ |
-
-Because the tests above ran against a **local PostgreSQL 16 instance**, you
-still need to configure your own database to run the app on your machine:
-start PostgreSQL (Docker or native), copy `backend/.env.example` →
-`backend/.env`, set your real `DB_*` values, run the migrations, then start
-the backend and frontend with the commands from the sections above. If
-PostgreSQL is not available, the backend refuses to start with a clear
-message and the integration tests skip themselves — nothing is mocked or
-faked.
-
-> Note: the `docker compose` path itself was not executed in the build
-> environment (no Docker daemon was available there); the identical schema
-> and connection settings were verified against a natively installed
-> PostgreSQL 16 over SCRAM password authentication.
-
----
-
-## Security checklist (college-project friendly)
-
-- [x] Plaintext passwords are never stored or logged
-- [x] Salted PBKDF2-HMAC-SHA256 with per-hash random salts and stored
-      iteration counts (upgrade-safe)
-- [x] Parameterized queries for every statement
-- [x] Server-side authentication on every protected route
-- [x] Row-level ownership checks (`user_id` filter) in SQL
-- [x] Secrets only in environment variables / git-ignored `.env`
-- [x] `.gitignore` excludes `.env`, build output, and generated files
-- [x] No hardcoded demo users; registration writes to PostgreSQL
-- [x] Sessions revocable server-side (logout deletes the row)
-- [x] Uniform auth errors (no account enumeration) + constant-time comparisons
+- Use `.env.example` as a template for local configuration.
+- Keep real `.env` files, database passwords, access tokens, and other secrets out of Git.
+- Check `.gitignore` before staging files.
+- If a secret was accidentally pushed to a repository, remove it from the repository and rotate the affected credential; deleting the file in a later commit does not invalidate an exposed secret.
 
 ## License
 
-Provided as a college project template — adapt freely for your submission.
+This project is provided as a college project template. Check with your instructor or project team before choosing a license for public redistribution.
